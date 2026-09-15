@@ -10,6 +10,8 @@ function parse(raw, fallback = null) {
 }
 
 export class MetadataStore {
+  #jsonMutation = Promise.resolve();
+
   constructor(rootDir = config.dataDir) {
     this.rootDir = rootDir;
     this.dbPath = path.join(rootDir, 'metadata.sqlite');
@@ -276,6 +278,105 @@ export class MetadataStore {
     return clone(record);
   }
 
+  /**
+   * Atomically reserve an idempotency key for a durable operation.
+   *
+   * SQLite's UNIQUE constraint plus INSERT OR IGNORE is the reservation
+   * boundary. Callers must inspect `created`; a false result means another
+   * caller already owns the key and must not dispatch the physical command.
+   */
+  async reserveTurn(turn = {}) {
+    await this.ready;
+    const idempotencyKey = String(turn.idempotencyKey || '').trim();
+    if (!idempotencyKey) throw new Error('A turn idempotencyKey is required for atomic reservation');
+    const record = {
+      id: String(turn.id || `turn_${idempotencyKey}`),
+      threadId: String(turn.threadId || 'passive-prompt'),
+      idempotencyKey,
+      status: String(turn.status || 'INFLIGHT'),
+      createdAt: turn.createdAt || nowIso(),
+      updatedAt: turn.updatedAt || turn.createdAt || nowIso(),
+      startedAt: turn.startedAt || '',
+      completedAt: turn.completedAt || '',
+      input: turn.input || {},
+      output: turn.output || null,
+      error: turn.error || null,
+    };
+    if (this.mode === 'sqlite') {
+      const result = await this.db.run(`INSERT OR IGNORE INTO turns
+        (id, thread_id, idempotency_key, status, created_at, updated_at, started_at, completed_at, input_json, output_json, error_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      record.id, record.threadId, record.idempotencyKey, record.status, record.createdAt, record.updatedAt,
+      record.startedAt || null, record.completedAt || null, json(record.input), json(record.output), json(record.error));
+      const row = await this.db.get('SELECT * FROM turns WHERE idempotency_key = ?', idempotencyKey);
+      return {
+        created: Number(result?.changes || 0) === 1,
+        turn: row ? this.#turnFromRow(row) : null,
+      };
+    }
+
+    return await this.#withJsonMutation(async () => {
+      const existing = await this.getTurnByIdempotencyKey(idempotencyKey);
+      if (existing) return { created: false, turn: existing };
+      this.state.turns[record.id] = clone(record);
+      this.state.turns[`idempotency:${idempotencyKey}`] = { ref: record.id };
+      this.state.turnEvents[record.id] = this.state.turnEvents[record.id] || [];
+      await this.#saveJson();
+      return { created: true, turn: clone(record) };
+    });
+  }
+
+  /** Atomically transition a reserved turn from one or more allowed states. */
+  async updateTurnByIdempotencyKey(key, { fromStatuses = [], patch = {} } = {}) {
+    await this.ready;
+    const idempotencyKey = String(key || '').trim();
+    if (!idempotencyKey) return null;
+    const allowed = Array.isArray(fromStatuses)
+      ? fromStatuses.map((status) => String(status || '')).filter(Boolean)
+      : [];
+    if (this.mode === 'sqlite') {
+      const current = await this.db.get('SELECT * FROM turns WHERE idempotency_key = ?', idempotencyKey);
+      if (!current) return null;
+      if (allowed.length && !allowed.includes(String(current.status || ''))) return this.#turnFromRow(current);
+      const next = {
+        status: patch.status !== undefined ? String(patch.status) : current.status,
+        updatedAt: patch.updatedAt || nowIso(),
+        startedAt: patch.startedAt !== undefined ? patch.startedAt : (current.started_at || ''),
+        completedAt: patch.completedAt !== undefined ? patch.completedAt : (current.completed_at || ''),
+        input: patch.input !== undefined ? patch.input : parse(current.input_json, {}),
+        output: patch.output !== undefined ? patch.output : parse(current.output_json, null),
+        error: patch.error !== undefined ? patch.error : parse(current.error_json, null),
+      };
+      const placeholders = allowed.map(() => '?').join(', ');
+      const whereStatus = allowed.length ? ` AND status IN (${placeholders})` : '';
+      await this.db.run(`UPDATE turns SET status = ?, updated_at = ?, started_at = ?, completed_at = ?, input_json = ?, output_json = ?, error_json = ?
+        WHERE idempotency_key = ?${whereStatus}`,
+      next.status, next.updatedAt, next.startedAt || null, next.completedAt || null,
+      json(next.input), json(next.output), json(next.error), idempotencyKey, ...allowed);
+      const row = await this.db.get('SELECT * FROM turns WHERE idempotency_key = ?', idempotencyKey);
+      return row ? this.#turnFromRow(row) : null;
+    }
+
+    return await this.#withJsonMutation(async () => {
+      const ref = this.state.turns[`idempotency:${idempotencyKey}`]?.ref;
+      const current = ref ? this.state.turns[ref] : null;
+      if (!current) return null;
+      if (allowed.length && !allowed.includes(String(current.status || ''))) return clone(current);
+      const next = {
+        ...current,
+        ...patch,
+        status: patch.status !== undefined ? String(patch.status) : current.status,
+        updatedAt: patch.updatedAt || nowIso(),
+        input: patch.input !== undefined ? patch.input : current.input,
+        output: patch.output !== undefined ? patch.output : current.output,
+        error: patch.error !== undefined ? patch.error : current.error,
+      };
+      this.state.turns[ref] = clone(next);
+      await this.#saveJson();
+      return clone(next);
+    });
+  }
+
   async getTurn(id) {
     await this.ready;
     if (this.mode === 'sqlite') {
@@ -425,6 +526,18 @@ export class MetadataStore {
       return rows.map((row) => ({ id: row.id, time: row.time, type: row.type, level: row.level, data: parse(row.data_json, {}) }));
     }
     return (this.state.turnEvents[turnId] || []).slice(0, safeLimit).map(clone);
+  }
+
+  async #withJsonMutation(operation) {
+    const previous = this.#jsonMutation;
+    let release;
+    this.#jsonMutation = new Promise((resolve) => { release = resolve; });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 
   #threadFromRow(row) {
