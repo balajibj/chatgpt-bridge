@@ -287,6 +287,8 @@
       const message = String(payload.message || '').trim();
       const options = payload.options || {};
       let request = null;
+      let submissionStarted = false;
+      let submissionReported = false;
       try {
         if (!commandId) throw new Error('passive.prompt.submit requires commandId');
         if (!message) throw new Error('Passive prompt message is empty');
@@ -308,6 +310,9 @@
         await waitForChatPageReady(request, { stage: 'passive-session' });
         await applyModelOptions(options, request);
         await waitForChatPageReady(request, { stage: 'passive-model', settleMs: 400 });
+        if (options.sessionId && String(getCurrentSession()?.id || '') !== String(options.sessionId)) {
+          throw new Error('Passive prompt target conversation did not match');
+        }
         baselinePassiveTurns('passive-prompt-submit', { markAll: true });
         const beforeTurns = getTurnNodes();
         const baseline = new Set(beforeTurns.map((turn, index) => turnKey(turn, index)).filter(Boolean));
@@ -319,11 +324,14 @@
           promptSubmissionStartedAt: Date.now(),
         });
         diagnostic('passive.prompt.submit.started', { commandId, baselineCount: baseline.size, length: message.length });
-        await enterPrompt(message, request, { kind: 'passive' });
+        await enterPrompt(message, request, {
+          kind: 'passive',
+          onSubmissionBoundary: () => { submissionStarted = true; },
+        });
         request.update('request.anchor_updated', { sentAt: Date.now() });
         await waitForSubmittedUserTurnAnchor(request, baseline, { kind: 'passive', replace: false, timeoutMs: 7_000 });
         refreshRequestTurnAnchors(request);
-        registerPassivePromptBoundary(request, baseline);
+        if (!request.submittedUserTurnKey) throw new Error('Passive prompt has no submitted user turn proof');
         send({
           type: 'passive.prompt.submitted',
           commandId,
@@ -332,11 +340,20 @@
           url: location.href,
           title: document.title,
         });
+        submissionReported = true;
+        // Observation bookkeeping cannot turn a confirmed submission into failure.
+        registerPassivePromptBoundary(request, baseline);
         diagnostic('passive.prompt.submit.completed', { commandId, submittedUserTurnKey: request.submittedUserTurnKey || '' });
         schedulePassiveTurnScan('passive-prompt-submitted', 500);
       } catch (err) {
-        send({ type: 'command.error', commandId, message: err.message || String(err) });
-        diagnostic('passive.prompt.submit.failed', { commandId, message: err.message || String(err) });
+        if (!submissionReported) send({
+          type: 'command.error', commandId,
+          code: submissionStarted ? 'PASSIVE_SUBMISSION_UNCERTAIN' : 'PASSIVE_REJECTED_BEFORE_SUBMIT',
+          submissionStatus: submissionStarted ? 'UNCERTAIN_AFTER_SUBMIT' : 'REJECTED_BEFORE_SUBMIT',
+          uncertain: submissionStarted,
+          message: submissionStarted ? 'Passive submission could not be confirmed' : 'Passive submission rejected before composer submission',
+        });
+        diagnostic('passive.prompt.submit.failed', { commandId, submissionStarted, submissionReported });
       } finally {
         if (request && getActiveRequest()?.requestId === request.requestId) {
           setActiveRequest(null);

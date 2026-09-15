@@ -464,7 +464,7 @@ export function createRouter(bridge, fileStore, eventBus = null, turnManager = n
 
   router.post('/browser/passive-prompt', async (req, res, next) => {
     try {
-      res.json({ ok: true, result: await bridge.submitPassivePrompt({
+      res.json({ ok: true, contract: 'passive-prompt-v1', submissionStatus: 'SUBMITTED', result: await bridge.submitPassivePrompt({
         message: req.body?.message,
         sessionId: req.body?.sessionId,
         effort: req.body?.effort,
@@ -472,7 +472,15 @@ export function createRouter(bridge, fileStore, eventBus = null, turnManager = n
         sourceClientId: req.body?.sourceClientId,
         timeoutMs: req.body?.timeoutMs,
       }) });
-    } catch (error) { next(error); }
+    } catch (error) {
+      const rejected = error.submissionStatus === 'REJECTED_BEFORE_SUBMIT';
+      res.status(rejected ? 422 : 503).json({
+        ok: false,
+        contract: 'passive-prompt-v1',
+        submissionStatus: rejected ? 'REJECTED_BEFORE_SUBMIT' : 'UNCERTAIN_AFTER_SUBMIT',
+        error: rejected ? 'Prompt rejected before submission' : 'Prompt submission could not be confirmed; do not resend',
+      });
+    }
   });
 
   registerWorkflowRoutes(router, workflowManager);
