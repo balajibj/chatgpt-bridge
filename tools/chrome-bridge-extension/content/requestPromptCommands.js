@@ -1,10 +1,8 @@
 // Focused request-command family. Loaded before requestCommands.js.
 (() => {
   'use strict';
-
   function createRequestPromptCommands(deps = {}) {
     const {
-      DOM_PARSER,
       REQUEST_STATE,
       applyModelOptions,
       applySessionOptions,
@@ -12,29 +10,21 @@
       baselinePassiveTurns,
       clickStopButton,
       collectAndEmit,
-      conversationIdFromUrl,
-      delay,
       diagnostic,
       emitChatEvent,
       enterPrompt,
       findStopButton,
-      findComposer,
-      findComposerRootStrict,
       getActiveRequest,
       getAssistantNodes,
       getConnectedServerInstanceId,
       getCurrentSession,
       getTurnNodes,
-      isGenerating,
       markRequestProgress,
-      normalizeText,
       refreshRequestTurnAnchors,
       registerPassivePromptBoundary,
       releaseRequest,
-      settleEffectReconciliation,
       settleReleaseCleanup,
       runObservedRequestEffect,
-      settleUnexecutableEffect,
       schedulePageStatus,
       schedulePassiveTurnScan,
       scheduleTabObservation,
@@ -47,10 +37,7 @@
       waitForChatPageReady,
       waitForDocumentReady,
       waitForSubmittedUserTurnAnchor,
-      pagePresence,
-      readIntelligenceState,
       readSubmittedUserTurnError,
-      resumeBoundaryTimeoutMs = 2_500,
     } = deps;
     const support = deps.requestCommandSupport || {};
     const { settleEffectCommandWithoutExecution } = support;
@@ -67,7 +54,6 @@
       const message = String(payload.message || '');
       const options = payload.options || {};
       const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
-
       if (!requestId) {
         diagnostic('prompt.execution.invalid_identity', { commandId, requestId, reason: 'request_id_missing' });
         return;
@@ -418,7 +404,6 @@
       const released = releaseRequest(activeRequest, String(payload.reason || payload.terminalCode || 'server_terminal'));
       await settleReleaseCleanup({ commandId, requestId, status: 'completed', released, ...releaseIdentity });
     }
-
 
     async function handlePromptSteer(payload) {
       const activeRequest = getActiveRequest();
