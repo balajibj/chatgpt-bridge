@@ -15,12 +15,14 @@ for (const match of lockText.matchAll(/"resolved"\s*:\s*"(https?:\/\/[^"]+)"/g))
   );
 }
 
-const output = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', [
-  'pack',
-  '--dry-run',
-  '--json',
-  '--ignore-scripts',
-], {
+const packArgs = ['pack', '--dry-run', '--json', '--ignore-scripts'];
+// Node 24 rejects direct .cmd spawning with EINVAL on Windows. Invoke the
+// fixed npm command through the Windows command interpreter instead; the
+// command and arguments are static release-check inputs.
+const packCommand = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : 'npm';
+const output = execFileSync(packCommand, process.platform === 'win32'
+  ? ['/d', '/s', '/c', `npm.cmd ${packArgs.join(' ')}`]
+  : packArgs, {
   cwd: process.cwd(),
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
