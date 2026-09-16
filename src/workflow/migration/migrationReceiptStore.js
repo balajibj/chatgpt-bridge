@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../../config.js';
 import { WORKFLOW_SERVER_BACKEND } from '../server/workflowServerState.js';
+import { syncDirectoryBestEffort, syncHandleBestEffort } from '../safeDirectorySync.js';
 
 export const WORKFLOW_MIGRATION_RECEIPT_STORE_VERSION = 1;
 export const WORKFLOW_MIGRATION_RECORD_VERSION = 1;
@@ -225,18 +226,13 @@ export class WorkflowMigrationReceiptStore {
     const handle = await fs.open(temporary, 'w');
     try {
       await handle.writeFile(`${JSON.stringify(state, null, 2)}\n`, 'utf8');
-      await handle.sync();
+      await syncHandleBestEffort(handle);
     } finally {
       await handle.close();
     }
     try {
       await fs.rename(temporary, this.file);
-      const directory = await fs.open(this.dir, 'r');
-      try {
-        await directory.sync();
-      } finally {
-        await directory.close();
-      }
+      await syncDirectoryBestEffort(fs, this.dir);
     } catch (error) {
       await fs.unlink(temporary).catch(() => null);
       throw error;

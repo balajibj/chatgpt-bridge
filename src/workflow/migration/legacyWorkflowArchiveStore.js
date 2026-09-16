@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from '../../config.js';
+import { syncHandleBestEffort } from '../safeDirectorySync.js';
 
 function safeId(value) {
   return String(value || 'workflow').replace(/[^a-zA-Z0-9._-]+/g, '-').slice(0, 160);
@@ -56,7 +57,7 @@ export class LegacyWorkflowArchiveStore {
     const handle = await fs.open(temporary, 'wx', 0o600);
     try {
       await handle.writeFile(`${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-      await handle.sync();
+      await syncHandleBestEffort(handle);
     } finally {
       await handle.close();
     }
