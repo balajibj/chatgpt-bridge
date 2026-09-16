@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handleCommand } from '../src/interactive/runtime.js';
+import { shellSplit } from '../src/interactive/format.js';
 import { makeDefaultState } from '../src/interactive/state.js';
 
 async function captureLogs(run) {
@@ -31,6 +32,14 @@ function bridgeWithClients(overrides = {}) {
     ...overrides,
   };
 }
+
+test('command parsing preserves Windows paths while retaining escaped spaces', () => {
+  assert.deepEqual(
+    shellSplit('/apply C:\\Users\\balaj\\AppData\\Local\\Temp\\result.zip --plan'),
+    ['/apply', 'C:\\Users\\balaj\\AppData\\Local\\Temp\\result.zip', '--plan'],
+  );
+  assert.deepEqual(shellSplit('/chat hello\\ world'), ['/chat', 'hello world']);
+});
 
 test('/tab commands call only canonical browser selection operations', async () => {
   let selected = '';
