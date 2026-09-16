@@ -120,7 +120,7 @@ export class BridgeOperations {
     return normalized;
   }
 
-  async submitPassivePrompt({ message, sessionId = '', effort = '', model = '', sourceClientId = '', timeoutMs = 60_000 } = {}) {
+  async submitPassivePrompt({ requestId = '', message, sessionId = '', effort = '', model = '', sourceClientId = '', timeoutMs = 60_000 } = {}) {
     const text = String(message || '').trim();
     if (!text) {
       const error = new Error('Passive prompt message is required');
@@ -130,7 +130,11 @@ export class BridgeOperations {
     const result = await this.#sendCommand('passive.prompt.submit', {
       message: text,
       options: { sessionId: String(sessionId || ''), effort: String(effort || ''), model: String(model || '') },
-    }, { sourceClientId: String(sourceClientId || ''), timeoutMs: Math.max(5_000, Number(timeoutMs) || 60_000) });
+    }, {
+      sourceClientId: String(sourceClientId || ''),
+      commandId: String(requestId || ''),
+      timeoutMs: Math.max(5_000, Number(timeoutMs) || 60_000),
+    });
     const actualSession = String(result?.session?.id || result?.sessionId || result?.conversationId || '');
     if (result?.type !== 'passive.prompt.submitted' || !result?.submittedUserTurnKey
         || (sessionId && actualSession !== String(sessionId))

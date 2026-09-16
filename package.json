@@ -69,7 +69,7 @@
     "sqlite3": "^6.0.1",
     "terlio.js": "1.1.0",
     "ws": "^8.18.0",
-    "zipflow": "1.9.0"
+    "zipflow": "https://codeload.github.com/balajibj/zipflow/tar.gz/59a5906e5ae3151d274c8f208f1869e978725eb8"
   },
   "bin": {
     "bridge": "bin/bridge.js",

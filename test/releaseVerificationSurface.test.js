@@ -24,6 +24,9 @@ test('release verification exposes local, live, clean-install, extension, and au
   const packageLock = await fs.readFile('package-lock.json', 'utf8');
   assert.doesNotMatch(packageLock, /internal\.api\.openai\.org|artifactory\/api\/npm/i);
   assert.match(packageLock, /https:\/\/registry\.npmjs\.org\/sqlite3\/-\/sqlite3-6\.0\.1\.tgz/);
+  assert.equal(packageJson.dependencies.zipflow, 'https://codeload.github.com/balajibj/zipflow/tar.gz/59a5906e5ae3151d274c8f208f1869e978725eb8');
+  assert.match(packageLock, /https:\/\/codeload\.github\.com\/balajibj\/zipflow\/tar\.gz\/59a5906e5ae3151d274c8f208f1869e978725eb8/);
+  assert.match(packageLock, /sha512-75SuDXpMl4j3drelqs90E\/UQew2PnOE69wtr8\/J9T5IuxsGnAzb4gZDiiiB6RL1FDizVGr0juoYlEYxFWHG5FQ==/);
   assert.equal(packageJson.scripts['verify:extension'], 'node scripts/verify-extension-deployment.js');
   assert.equal(packageJson.scripts['verify:release:local'], 'node scripts/release-verify.js --local');
   assert.equal(packageJson.scripts['verify:release:live'], 'node scripts/release-verify.js --live');

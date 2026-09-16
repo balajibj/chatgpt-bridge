@@ -19,6 +19,7 @@ import { streamTurnEvents } from './http/publicTurnStream.js';
 import { streamObservedTurns } from './http/observedTurnStream.js';
 import { registerWorkflowRoutes } from './http/workflowRoutes.js';
 import { extensionReloadTrampolineHtml, normalizeExtensionReloadDelay, normalizeExtensionReloadTarget } from './http/extensionReloadTrampoline.js';
+import { registerPassivePromptRoutes } from './http/passivePromptRoutes.js';
 import { BRIDGE_VERSION, EXTENSION_COMPATIBILITY } from './extensionCompatibility.js';
 
 
@@ -462,26 +463,7 @@ export function createRouter(bridge, fileStore, eventBus = null, turnManager = n
     } catch (error) { next(error); }
   });
 
-  router.post('/browser/passive-prompt', async (req, res, next) => {
-    try {
-      res.json({ ok: true, contract: 'passive-prompt-v1', submissionStatus: 'SUBMITTED', result: await bridge.submitPassivePrompt({
-        message: req.body?.message,
-        sessionId: req.body?.sessionId,
-        effort: req.body?.effort,
-        model: req.body?.model,
-        sourceClientId: req.body?.sourceClientId,
-        timeoutMs: req.body?.timeoutMs,
-      }) });
-    } catch (error) {
-      const rejected = error.submissionStatus === 'REJECTED_BEFORE_SUBMIT';
-      res.status(rejected ? 422 : 503).json({
-        ok: false,
-        contract: 'passive-prompt-v1',
-        submissionStatus: rejected ? 'REJECTED_BEFORE_SUBMIT' : 'UNCERTAIN_AFTER_SUBMIT',
-        error: rejected ? 'Prompt rejected before submission' : 'Prompt submission could not be confirmed; do not resend',
-      });
-    }
-  });
+  registerPassivePromptRoutes(router, bridge);
 
   registerWorkflowRoutes(router, workflowManager);
 
