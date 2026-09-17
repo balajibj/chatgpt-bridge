@@ -87,6 +87,36 @@ Authorization: Bearer <API_TOKEN>
 
 The browser extension uses a separate `BRIDGE_TOKEN`. It is intentionally separate from `API_TOKEN`: the browser agent does not need full API access. Paste the Bridge token once into the floating Bridge panel on the ChatGPT page.
 
+## Direct Full-Power owner-PC Bridge
+
+The optional Full-Power adapter is a separate, loopback-only execution plane.
+An authenticated Main Manager/Manager caller can use the Node Bridge routes
+without GPT Controller being in the execution path:
+
+```text
+Manager chat -> authenticated ChatGPT Bridge -> Full-Power adapter -> owner PC
+```
+
+Set `FULL_POWER_BRIDGE_URL` and `FULL_POWER_BRIDGE_TOKEN` in the Node Bridge
+environment. The adapter separately requires its own
+`YAZHAN_FULL_POWER_BRIDGE_TOKEN`, `YAZHAN_FULL_POWER_OWNER_TOKEN`, and
+`YAZHAN_FULL_POWER_CAPABILITY_SECRET`. The Node Bridge exposes:
+
+```text
+POST /v1/full-power/capabilities
+POST /v1/full-power/jobs
+GET  /v1/full-power/jobs
+GET  /v1/full-power/jobs/:jobId
+POST /v1/full-power/owner/jobs/:jobId/{challenge|confirm|cancel}
+```
+
+Every request still requires the Node `API_TOKEN`; capabilities are short-lived,
+one-use, payload-hash-bound authorizations. Protected scopes require the
+separate owner token and exact confirmation. The adapter stages large scripts
+instead of putting them into one shell command, records a durable receipt, and
+never retries an uncertain execution automatically. These routes do not accept
+credentials in query strings and do not provide an unscoped public shell.
+
 ## Install and configure the browser companion
 
 Start the bridge and open the setup page:
@@ -823,6 +853,10 @@ Environment variables:
 | `AUTO_OPEN_TAB_TIMEOUT_MS` | `30000` | Maximum wait for the token-matched auto-opened tab to connect |
 | `AUTO_OPEN_TAB_BOOTSTRAP_WAIT_MS` | `2500` | Grace period for an existing extension tab to reconnect before using the system browser |
 | `BRIDGE_TOKEN` | generated into `.env` on first startup | Token required by the browser extension companion |
+| `FULL_POWER_BRIDGE_URL` | `http://127.0.0.1:8788` | Local Full-Power Bridge adapter URL; the Node Bridge only proxies authenticated requests to it |
+| `FULL_POWER_BRIDGE_TOKEN` | empty | Internal Bridge token for the standalone Full-Power adapter; direct execution remains disabled until configured |
+| `FULL_POWER_OWNER_TOKEN` | empty | Separate owner-confirmation token used only for protected Full-Power jobs; never publish it in logs or chat |
+| `FULL_POWER_REQUEST_TIMEOUT_MS` | `30000` | Timeout for one Node Bridge request to the local Full-Power adapter |
 | `ALLOWED_ORIGINS` | `https://chatgpt.com,https://chat.openai.com,null` | Accepted WebSocket origins when WS transport is used |
 | `PAYLOAD_DEBUG` | `0` | Enable `/v1/chat/completions` payload dump |
 | `PAYLOAD_DEBUG_FILE` | `./last_openclaw_payload.json` | Debug dump path when `PAYLOAD_DEBUG=1` |
