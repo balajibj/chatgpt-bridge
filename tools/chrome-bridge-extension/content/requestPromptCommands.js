@@ -310,10 +310,12 @@
           promptSubmissionStartedAt: Date.now(),
         });
         diagnostic('passive.prompt.submit.started', { commandId, baselineCount: baseline.size, length: message.length });
+        diagnostic('passive.prompt.enter.started', { requestId: request.requestId, commandId, length: message.length });
         await enterPrompt(message, request, {
           kind: 'passive',
           onSubmissionBoundary: () => { submissionStarted = true; },
         });
+        diagnostic('passive.prompt.enter.returned', { requestId: request.requestId, commandId });
         request.update('request.anchor_updated', { sentAt: Date.now() });
         await waitForSubmittedUserTurnAnchor(request, baseline, { kind: 'passive', replace: false, timeoutMs: 7_000 });
         refreshRequestTurnAnchors(request);
