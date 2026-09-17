@@ -831,6 +831,7 @@ Environment variables:
 | `ANSWER_DONE_SETTLE_MS` | `600` | Shorter answer-stability window after generation appears idle |
 | `POST_STOP_TERMINAL_SETTLE_MS` | `900` | How long the completed action-bar state must remain stable after Stop disappears |
 | `PROMPT_ACCEPTED_TIMEOUT_MS` | `10000` | Max wait for the extension content script to accept a prompt command |
+| `PASSIVE_PROMPT_REVIEW_AFTER_MS` | `120000` | Read-only age threshold after which an unconfirmed passive prompt is shown as `NEEDS_OWNER_REVIEW`; it never enables a resend |
 | `HEARTBEAT_INTERVAL_MS` | `10000` | Server ping interval for connected extension tabs; heartbeat is hard liveness, not meaningful request progress |
 | `CLIENT_STALE_MS` | `30000` | Disconnect stale browser companion clients |
 | `REQUEST_MEANINGFUL_PROGRESS_TIMEOUT_MS` | `120000` | Long result-phase inactivity limit for a non-generating request; active generation is not stopped by this timer and heartbeat alone does not reset it |

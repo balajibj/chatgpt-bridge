@@ -163,6 +163,10 @@ export const config = Object.freeze({
   requiredArtifactSettleMs: intFromEnv('REQUIRED_ARTIFACT_SETTLE_MS', 30_000),
   promptDeliveryTimeoutMs: intFromEnv('PROMPT_DELIVERY_TIMEOUT_MS', 30_000),
   promptAcceptedTimeoutMs: intFromEnv('PROMPT_ACCEPTED_TIMEOUT_MS', 10_000),
+  // An INFLIGHT passive write remains resend-blocked forever.  After this
+  // bounded read-only window, surface it for owner review without changing
+  // the durable write-safety state.
+  passivePromptReviewAfterMs: Math.max(1_000, intFromEnv('PASSIVE_PROMPT_REVIEW_AFTER_MS', 120_000)),
   chatGptTransientErrorMaxRetries: intFromEnv('CHATGPT_TRANSIENT_ERROR_MAX_RETRIES', 3),
   chatGptTransientErrorRetryBaseMs: intFromEnv('CHATGPT_TRANSIENT_ERROR_RETRY_BASE_MS', 1_000),
   chatGptTransientErrorRetryMaxMs: intFromEnv('CHATGPT_TRANSIENT_ERROR_RETRY_MAX_MS', 8_000),
