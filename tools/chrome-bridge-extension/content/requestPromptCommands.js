@@ -290,8 +290,8 @@
         // This is one standalone durable command, not a canonical request.
         // Its internal read waits and DOM writes are settled by the command ledger
         // as a whole, so it must not invent request BrowserEffect identities.
-        await waitForDocumentReady(); const pageReadyTimeoutMs = Math.max(5_000, Number(options.pageReadyTimeoutMs) || 0), readiness = pageReadyTimeoutMs ? { timeoutMs: pageReadyTimeoutMs } : {};
-        await waitForChatPageReady(request, { ...readiness, stage: 'passive-initial' });
+        const pageReadyTimeoutMs = Math.max(5_000, Number(options.pageReadyTimeoutMs) || 0), readiness = pageReadyTimeoutMs ? { timeoutMs: pageReadyTimeoutMs } : {};
+        await waitForDocumentReady(pageReadyTimeoutMs); await waitForChatPageReady(request, { ...readiness, stage: 'passive-initial' });
         await applySessionOptions(options, request);
         await waitForChatPageReady(request, { ...readiness, stage: 'passive-session' });
         await applyModelOptions(options, request);
