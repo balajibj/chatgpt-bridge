@@ -243,6 +243,35 @@ async function waitForSteerSubmitButton(request, timeoutMs = resolveSteerSubmitR
   return await promise;
 }
 
+async function waitForPromptSendButton(request, timeoutMs = 2_000) {
+  const started = Date.now();
+  const limit = Math.max(250, Number(timeoutMs) || 2_000);
+  let lastDiagnosticAt = 0;
+  while (Date.now() - started < limit) {
+    const button = findSendButton([findComposerRootStrict()].filter(Boolean));
+    if (button) {
+      diagnostic('prompt.submit.ready', {
+        requestId: request?.requestId || '',
+        waitedMs: Date.now() - started,
+        label: button.getAttribute?.('aria-label') || button.getAttribute?.('title') || button.getAttribute?.('data-testid') || '',
+      });
+      return button;
+    }
+    const now = Date.now();
+    if (!lastDiagnosticAt || now - lastDiagnosticAt >= 1_000) {
+      lastDiagnosticAt = now;
+      diagnostic('prompt.submit.waiting', {
+        requestId: request?.requestId || '',
+        waitedMs: now - started,
+        timeoutMs: limit,
+        sendButtonVisible: false,
+      });
+    }
+    await delay(Math.min(100, Math.max(1, limit - (Date.now() - started))));
+  }
+  return null;
+}
+
 async function enterPrompt(message, request, options = {}) {
   const kind = String(options.kind || 'prompt');
   const ackTimeoutMs = resolveSubmissionAckTimeoutMs(request, kind);
@@ -277,7 +306,18 @@ async function enterPrompt(message, request, options = {}) {
       method = submitComposer(composer, request, { kind, attempt: 1, button: ready.button });
     } else {
       evidenceWaiter = createPromptSubmissionEvidenceWaiter(request, baselineTurnKeys, message, composer, ackTimeoutMs);
-      method = submitComposer(composer, request, { kind, attempt: 1, onSubmissionBoundary: options.onSubmissionBoundary });
+      // ChatGPT's current ProseMirror composer updates its submit control
+      // asynchronously after the input event. Give React a short bounded
+      // window to expose the real button before falling back to form/keyboard
+      // submission; submitting the form while its state is still empty is a
+      // silent no-op on that surface.
+      const readyButton = await waitForPromptSendButton(request);
+      method = submitComposer(composer, request, {
+        kind,
+        attempt: 1,
+        button: readyButton || undefined,
+        onSubmissionBoundary: options.onSubmissionBoundary,
+      });
     }
   } catch (error) {
     evidenceWaiter?.cancel?.();
@@ -814,6 +854,7 @@ function isUsableButton(element) {
       resolveSubmissionAckTimeoutMs,
       resolveSteerSubmitReadyTimeoutMs,
       waitForSteerSubmitButton,
+      waitForPromptSendButton,
       submitComposer,
       findComposer,
       buttonSignalText,

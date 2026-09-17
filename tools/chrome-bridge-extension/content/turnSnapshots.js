@@ -48,7 +48,15 @@ const TURN_SELECTOR = '[data-testid^="conversation-turn-"][data-turn],section[da
 
 function getTurnNodes() {
   // Selector-list results are already unique and document-ordered.
-  return Array.from(document.querySelectorAll(TURN_SELECTOR));
+  const anchored = Array.from(document.querySelectorAll(TURN_SELECTOR));
+  if (anchored.length) return anchored;
+
+  // ChatGPT's newer conversation surface can expose the author role directly
+  // on the message node without the historical section[data-turn] wrapper.
+  // Use that shape only when the canonical wrapper is absent so existing
+  // nested-turn handling remains unchanged.
+  return Array.from(document.querySelectorAll('[data-message-author-role]'))
+    .filter((node) => node.getAttribute?.('data-message-author-role'));
 }
 function isCredibleFinalAssistantNode(node) {
   if (!node?.matches?.('[data-message-author-role="assistant"]')) return false;

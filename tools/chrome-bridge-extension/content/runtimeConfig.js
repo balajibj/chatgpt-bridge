@@ -33,7 +33,10 @@
     attachmentUploadTimeoutMs: 90_000,
     pageReadyTimeoutMs: 45_000,
     pageReadySettleMs: 1_000,
-    promptSubmitAckTimeoutMs: 4_000,
+    // Modern ChatGPT pages can take several seconds to materialize the
+    // submitted user turn after the composer click. Keep the proof window
+    // bounded, but do not classify a slow, valid submission as uncertain.
+    promptSubmitAckTimeoutMs: 10_000,
     steerSubmitAckTimeoutMs: 30_000,
     steerSubmitReadyTimeoutMs: 30_000,
     generationStartTimeoutMs: 30_000,

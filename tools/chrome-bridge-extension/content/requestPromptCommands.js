@@ -332,14 +332,15 @@
         diagnostic('passive.prompt.submit.completed', { commandId, submittedUserTurnKey: request.submittedUserTurnKey || '' });
         schedulePassiveTurnScan('passive-prompt-submitted', 500);
       } catch (err) {
+        const detail = String(err?.message || err || 'unknown passive prompt failure').slice(0, 240);
         if (!submissionReported) send({
           type: 'command.error', commandId,
           code: submissionStarted ? 'PASSIVE_SUBMISSION_UNCERTAIN' : 'PASSIVE_REJECTED_BEFORE_SUBMIT',
           submissionStatus: submissionStarted ? 'UNCERTAIN_AFTER_SUBMIT' : 'REJECTED_BEFORE_SUBMIT',
           uncertain: submissionStarted,
-          message: submissionStarted ? 'Passive submission could not be confirmed' : 'Passive submission rejected before composer submission',
+          message: `${submissionStarted ? 'Passive submission could not be confirmed' : 'Passive submission rejected before composer submission'}: ${detail}`,
         });
-        diagnostic('passive.prompt.submit.failed', { commandId, submissionStarted, submissionReported });
+        diagnostic('passive.prompt.submit.failed', { commandId, submissionStarted, submissionReported, code: String(err?.code || ''), detail });
       } finally {
         if (request && getActiveRequest()?.requestId === request.requestId) {
           setActiveRequest(null);
@@ -486,7 +487,6 @@
         });
       }
     }
-
     return Object.freeze({
       handlePromptSend,
       handlePassivePromptSubmit,
