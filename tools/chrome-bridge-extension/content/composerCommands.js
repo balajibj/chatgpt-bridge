@@ -558,6 +558,30 @@ function setComposerTextByNativeValue(element, text) {
 
 function setComposerTextByExecCommand(element, text) {
   clearComposerElement(element);
+  // ProseMirror's current ChatGPT composer derives its transaction from the
+  // browser editing boundary.  A synthetic `input` after a DOM write can
+  // leave the visible text present while React still owns an empty editor
+  // state, which makes the send control stay in its voice state.  Re-arm a
+  // collapsed selection and emit the same beforeinput -> edit -> input
+  // sequence used by a normal text insertion before falling back to the
+  // legacy execCommand path.
+  try {
+    element.focus?.();
+    const selection = window.getSelection?.();
+    const range = document.createRange?.();
+    if (selection && range) {
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  } catch {}
+  element.dispatchEvent(new InputEvent('beforeinput', {
+    bubbles: true,
+    cancelable: true,
+    inputType: 'insertText',
+    data: text,
+  }));
   if (document.execCommand) document.execCommand('insertText', false, text);
   element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
 }
