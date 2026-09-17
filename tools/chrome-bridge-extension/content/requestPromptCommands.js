@@ -290,12 +290,12 @@
         // This is one standalone durable command, not a canonical request.
         // Its internal read waits and DOM writes are settled by the command ledger
         // as a whole, so it must not invent request BrowserEffect identities.
-        await waitForDocumentReady();
-        await waitForChatPageReady(request, { stage: 'passive-initial' });
+        await waitForDocumentReady(); const pageReadyTimeoutMs = Math.max(5_000, Number(options.pageReadyTimeoutMs) || 0), readiness = pageReadyTimeoutMs ? { timeoutMs: pageReadyTimeoutMs } : {};
+        await waitForChatPageReady(request, { ...readiness, stage: 'passive-initial' });
         await applySessionOptions(options, request);
-        await waitForChatPageReady(request, { stage: 'passive-session' });
+        await waitForChatPageReady(request, { ...readiness, stage: 'passive-session' });
         await applyModelOptions(options, request);
-        await waitForChatPageReady(request, { stage: 'passive-model', settleMs: 400 });
+        await waitForChatPageReady(request, { ...readiness, stage: 'passive-model', settleMs: 400 });
         if (options.sessionId && String(getCurrentSession()?.id || '') !== String(options.sessionId)) {
           throw new Error('Passive prompt target conversation did not match');
         }

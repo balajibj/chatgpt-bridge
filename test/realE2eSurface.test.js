@@ -294,6 +294,21 @@ test('passive prompt submission uses a browser command without creating a pendin
   const command = hub.commands.find((entry) => entry.payload.type === 'passive.prompt.submit');
   assert.equal(command.payload.options.sessionId, 'passive-session');
   assert.equal(command.payload.options.effort, 'instant');
+  assert.equal(command.payload.options.pageReadyTimeoutMs, 30_000);
+  await bridge.close();
+});
+
+test('passive prompt readiness stays inside a short command deadline', async () => {
+  const hub = new BrowserCommandHub();
+  const bridge = new BrowserBridge(hub, null, null, {});
+  await bridge.submitPassivePrompt({
+    message: 'short deadline',
+    sessionId: 'passive-session',
+    sourceClientId: 'bootstrap',
+    timeoutMs: 10_000,
+  });
+  const command = hub.commands.find((entry) => entry.payload.type === 'passive.prompt.submit');
+  assert.equal(command.payload.options.pageReadyTimeoutMs, 8_000);
   await bridge.close();
 });
 
