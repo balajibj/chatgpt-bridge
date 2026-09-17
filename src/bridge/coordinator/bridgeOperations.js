@@ -132,7 +132,13 @@ export class BridgeOperations {
     // on a missing composer until the server times out, leaving the durable
     // passive-prompt ledger INFLIGHT forever.
     const commandTimeoutMs = Math.max(5_000, Number(timeoutMs) || 60_000);
-    const pageReadyTimeoutMs = Math.max(5_000, Math.min(30_000, commandTimeoutMs - 2_000));
+    // The controller intentionally gives a freshly launched Edge page time to
+    // hydrate its composer.  A fixed 30 s cap can expire at the same moment
+    // the composer becomes ready (especially on a cold profile), causing a
+    // false REJECTED_BEFORE_SUBMIT before the browser write boundary.  Keep
+    // readiness inside the command deadline while reserving a small tail for
+    // the actual command/response settlement.
+    const pageReadyTimeoutMs = Math.max(5_000, commandTimeoutMs - 2_000);
     const result = await this.#sendCommand('passive.prompt.submit', {
       message: text,
       options: {
