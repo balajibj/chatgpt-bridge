@@ -380,11 +380,6 @@ function submitComposer(composer, request, options = {}) {
   if (button) {
     diagnostic('send_button.found', { requestId: request.requestId, kind, attempt, label: button.getAttribute('aria-label') || button.getAttribute('title') || button.getAttribute('data-testid') || '' });
     options.onSubmissionBoundary?.();
-    const form = composer.closest?.('form') || (composerRoot?.tagName === 'FORM' ? composerRoot : composerRoot?.closest?.('form')) || null;
-    if (String(button.getAttribute?.('type') || '').toLowerCase() === 'submit' && form && typeof form.requestSubmit === 'function') {
-      form.requestSubmit(button);
-      return 'form_request_submit_button';
-    }
     button.click();
     return 'button';
   }
@@ -486,6 +481,7 @@ async function focusAndSetComposerText(element, text, request) {
   await delay(20);
 
   const attempts = [
+    { name: 'page_main', apply: () => setComposerTextByPageMain(element, text, request) },
     { name: 'paste', apply: () => setComposerTextByPaste(element, text) },
     { name: 'exec_command', apply: () => setComposerTextByExecCommand(element, text) },
     { name: 'text_content', apply: () => setComposerTextByTextContent(element, text) },
@@ -494,11 +490,20 @@ async function focusAndSetComposerText(element, text, request) {
 
   for (let i = 0; i < attempts.length; i += 1) {
     const attempt = attempts[i];
-    try { attempt.apply(); } catch (error) {
+    let result;
+    try { result = await attempt.apply(); } catch (error) {
       diagnostic('composer.text_method_failed', {
         requestId: request.requestId,
         method: attempt.name,
         message: String(error?.message || error).slice(0, 160),
+      });
+      continue;
+    }
+    if (result && result.ok === false) {
+      diagnostic('composer.text_method_failed', {
+        requestId: request.requestId,
+        method: attempt.name,
+        message: String(result.error || 'page main world did not verify composer text').slice(0, 160),
       });
       continue;
     }
@@ -584,6 +589,28 @@ function setComposerTextByExecCommand(element, text) {
   }));
   if (document.execCommand) document.execCommand('insertText', false, text);
   element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+}
+
+function setComposerTextByPageMain(element, text, request) {
+  if (!element || !(element.isContentEditable || element.getAttribute?.('contenteditable'))) return { ok: false, error: 'not_contenteditable' };
+  const requestId = `composer-main-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+      resolve(result && typeof result === 'object' ? result : { ok: false, error: 'invalid_main_world_result' });
+    };
+    const onMessage = (event) => {
+      if (event.source !== window || event.data?.source !== 'chatgpt-bridge-composer-main-v1' || event.data?.type !== 'composer.set.result' || String(event.data.requestId || '') !== requestId) return;
+      finish(event.data.result);
+    };
+    const timer = setTimeout(() => finish({ ok: false, error: 'main_world_composer_timeout' }), 1_200);
+    window.addEventListener('message', onMessage);
+    window.postMessage({ source: 'chatgpt-bridge-composer-content-v1', type: 'composer.set', requestId, text: String(text || ''), diagnosticRequestId: request?.requestId || '' }, '*');
+  });
 }
 
 function setComposerTextByTextContent(element, text) {

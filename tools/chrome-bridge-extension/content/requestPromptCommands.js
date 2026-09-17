@@ -135,14 +135,12 @@
         schedulePageStatus('page.changed', 0);
         scheduleTabObservation('request.activated', 0);
       }
-
       try {
         if (!continuingExecution) {
           setRequestPhase(request, 'prompt_accepted_by_content_script', { meaningful: true });
           diagnostic('prompt.accepted', { requestId });
           emitChatEvent(request, 'prompt.accepted');
         }
-
         if (currentStepKind === 'page.ready.initial') {
           await runObservedRequestEffect(request, currentStepKind, async () => {
             await waitForDocumentReady();
