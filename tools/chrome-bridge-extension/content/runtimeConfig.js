@@ -8,10 +8,22 @@
   const TEMPORARY_CONNECTION_TTL_MS = 5 * 60_000;
   const BRIDGE_LAUNCH_TOKEN_RE = /^bridge-[a-z0-9][a-z0-9_-]{7,127}$/i;
   const LOOPBACK_BRIDGE_HOSTS = new Set(['127.0.0.1', 'localhost']);
+  const AUTOMATION_CONFIG = (() => {
+    try {
+      const value = globalThis.ChatGptBridgeAutomationConfig;
+      if (!value || typeof value !== 'object') return { serverUrl: '', token: '' };
+      return {
+        serverUrl: String(value.serverUrl || ''),
+        token: String(value.token || ''),
+      };
+    } catch {
+      return { serverUrl: '', token: '' };
+    }
+  })();
 
   const DEFAULT_CONFIG = {
-    serverUrl: 'http://127.0.0.1:8080',
-    token: '',
+    serverUrl: AUTOMATION_CONFIG.serverUrl || 'http://127.0.0.1:8080',
+    token: AUTOMATION_CONFIG.token,
     reconnectMs: 1500,
     domPollMs: 250,
     defaultAnswerSettleMs: 1500,

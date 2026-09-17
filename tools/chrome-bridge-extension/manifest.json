@@ -40,6 +40,7 @@
       "js": [
         "shared/buildIdentity.js",
         "content/extensionApi.js",
+        "content/automationConfig.js",
         "content/runtimeConfig.js",
         "artifactParserCore.js",
         "domParserCore.js",
