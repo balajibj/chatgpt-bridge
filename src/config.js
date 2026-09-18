@@ -174,6 +174,14 @@ export const config = Object.freeze({
   clientStaleMs: intFromEnv('CLIENT_STALE_MS', 30_000),
   debugEventsLimit: intFromEnv('DEBUG_EVENTS_LIMIT', 250),
   bridgeToken: stringFromEnv('BRIDGE_TOKEN', ''),
+  // The Full-Power adapter is a separate local process.  The Node Bridge
+  // proxies only authenticated, capability-scoped requests to it; it never
+  // executes shell text itself and it is not required for the adapter's
+  // direct Manager -> owner-PC path.
+  fullPowerBridgeUrl: stringFromEnv('FULL_POWER_BRIDGE_URL', 'http://127.0.0.1:8788'),
+  fullPowerBridgeToken: stringFromEnv('FULL_POWER_BRIDGE_TOKEN', ''),
+  fullPowerOwnerToken: stringFromEnv('FULL_POWER_OWNER_TOKEN', ''),
+  fullPowerRequestTimeoutMs: intFromEnv('FULL_POWER_REQUEST_TIMEOUT_MS', 30_000),
   publicBaseUrl: stringFromEnv('PUBLIC_BASE_URL', `http://${stringFromEnv('HOST', '127.0.0.1')}:${intFromEnv('PORT', 8080)}`),
   attachmentTransport: stringFromEnv('ATTACHMENT_TRANSPORT', 'url'),
   artifactChunkTimeoutMs: intFromEnv('ARTIFACT_CHUNK_TIMEOUT_MS', 60_000),
