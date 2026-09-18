@@ -61,6 +61,15 @@ export function registerFullPowerBridgeRoutes(router) {
     catch (error) { next(error); }
   });
 
+  router.get('/v1/full-power/owner/jobs/:jobId/result', requireStrictApiToken, requireFullPowerOwnerToken, async (req, res, next) => {
+    try {
+      res.json(await forwardFullPowerRequest(`/v1/owner/jobs/${encodeURIComponent(req.params.jobId)}/result`, {
+        method: 'GET',
+        authToken: config.fullPowerOwnerToken,
+      }));
+    } catch (error) { next(error); }
+  });
+
   router.post('/v1/full-power/owner/jobs/:jobId/:action', requireStrictApiToken, requireFullPowerOwnerToken, async (req, res, next) => {
     try {
       const action = String(req.params.action || '').trim().toLowerCase();
