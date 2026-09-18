@@ -20,7 +20,12 @@ const adapter = await startMock(async (req, res) => {
   seen.push({ method: req.method, url: req.url, authorization: req.headers.authorization, body });
   const owner = req.url.startsWith('/v1/owner/');
   res.writeHead(owner ? 200 : 201, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(owner ? { job_id: 'job-1', authorized: true } : { job_id: 'job-1', direct_bridge: true }));
+  const payload = owner && req.method === 'GET'
+    ? { job_id: 'job-1', stdout: 'API_TOKEN=owner-visible-secret' }
+    : owner
+      ? { job_id: 'job-1', authorized: true }
+      : { job_id: 'job-1', direct_bridge: true };
+  res.end(JSON.stringify(payload));
 });
 
 const configDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bridge-full-power-routes-'));
@@ -78,13 +83,24 @@ test('Node Bridge exposes direct Manager-to-Full-Power routes without Controller
     assert.equal(seen[0].authorization, `Bearer ${process.env.FULL_POWER_BRIDGE_TOKEN}`);
     assert.equal(seen[1].authorization, `Bearer ${process.env.FULL_POWER_OWNER_TOKEN}`);
 
+    const ownerResult = await fetch(`${app.url}/v1/full-power/owner/jobs/job-1/result`, {
+      headers: {
+        authorization: `Bearer ${process.env.API_TOKEN}`,
+        'x-full-power-owner-token': process.env.FULL_POWER_OWNER_TOKEN,
+      },
+    });
+    assert.equal(ownerResult.status, 200);
+    assert.deepEqual(await ownerResult.json(), { job_id: 'job-1', stdout: 'API_TOKEN=owner-visible-secret' });
+    assert.equal(seen[2].authorization, `Bearer ${process.env.FULL_POWER_OWNER_TOKEN}`);
+    assert.equal(seen[2].method, 'GET');
+
     const ownerDenied = await fetch(`${app.url}/v1/full-power/owner/jobs/job-1/cancel`, {
       method: 'POST',
       headers: { authorization: `Bearer ${process.env.API_TOKEN}`, 'content-type': 'application/json' },
       body: JSON.stringify({}),
     });
     assert.equal(ownerDenied.status, 401);
-    assert.equal(seen.length, 2);
+    assert.equal(seen.length, 3);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }
